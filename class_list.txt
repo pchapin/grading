@@ -1,0 +1,40 @@
+#
+# FILE        : class_list.txt
+# AUTHOR      : Peter Chapin
+# LAST REVISED: August 30, 2013
+# SUBJECT     : List of all students taking classes with me.
+#
+
+#LAST     =
+#FIRST    =
+#EMAIL    = (comma delimited list of "official" email addresses the student wants to use)
+#PHONE    =
+#CLASS    = (comma delimited list of classes the student is taking with me)
+#USERNAME = (username on CIS department Unix hosts)
+#PASSWORD = (used as initial passwords or for password resets)
+#COMMENT  =
+
+# Template (Copy this entry to start a new entry)
+#LAST      =
+#FIRST     =
+#EMAIL     =
+#PHONE     =
+#CLASS     =
+#USERNAME  =
+#PASSWORD  =
+#COMMENT   =
+
+# Sample
+#LAST     = Jones
+#FIRST    = Jill
+#EMAIL    = JJones@vtc.vsc.edu, jjones@lemuria.cis.vtc.edu
+#PHONE    =
+#CLASS    = CIS-3030, CIS-3620
+#USERNAME = jjones
+#PASSWORD = hinixpty
+#COMMENT  = This entry just shows how the fields can be used.
+
+# The entries below are specific to the current semester.
+
+
+# End (This line must be here).

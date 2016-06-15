@@ -1,0 +1,278 @@
+#!/usr/bin/perl
+###########################################################################
+# FILE    : procsub
+# SUBJECT : Script to process submissions via email (Unix version)
+# AUTHOR  : Peter C. Chapin <PChapin@vtc.vsc.edu>
+#
+# This program processes the mail message at its standard input as a on-line course submission.
+# It determines which assignment the submission is for, installs the submission into an
+# appropriate folder, and emails a confirmation to the sender.
+###########################################################################
+
+sub Assignment_Error {
+    my $From_Address = $_[0];
+    open(MAILER, "|/bin/mail -s \"sub Error encountered.\" $From_Address");
+    print MAILER <<EOF;
+
+Error encountered!
+
+You recently sent me a submission. However, I was unable to process it because I could not
+recognize the assignment from your subject line. Please send me the submission again, but be
+sure to use the following format in your subject line:
+
+    Subject: !sub cis-xxxx, Homework y
+
+where "xxxx" is the course number and "y" is the homework number, or
+
+    Subject: !sub cis-xxxx, lab y
+
+where "y" is the lab number.
+
+The text you use in the subject line is not case sensitive. (Also certain abbreviations are
+possible).
+
+Thank you,
+The Submission Daemon
+EOF
+
+    close(MAILER);
+    exit;
+}
+
+
+sub Submission_Error {
+    my $From_Address = $_[0];
+    open(MAILER, "|/bin/mail -s \"sub Error encountered.\" $From_Address");
+    print MAILER <<EOF;
+
+Error encountered!
+
+You recently sent me a submission with a subject line of
+
+    $Description
+
+However I am no longer accepting submissions for this assignment because it is now past its due
+date.
+
+If your circumstances are exceptional and you feel that I should accept your submission anyway,
+please send me a note describing your situation and I'll consider it. If you feel that you
+received this message in error it might be because you used the wrong assignment number in your
+submission. Please check the assignment number and resubmit if appropriate.
+
+Thank you,
+The Submission Daemon
+EOF
+
+    close(MAILER);
+    exit;
+}
+
+
+sub General_Error {
+    my $From_Address = $_[0];
+    my $Description  = $_[1];
+
+    open(MAILER, "|/bin/mail -s \"sub Error encountered.\" $From_Address");
+    print MAILER <<EOF;
+
+Error encountered!
+
+You recently sent me a submission with a subject line of
+
+    $Description
+
+However, for some reason an error occured while I was filing your submission. You should assume
+that I did NOT get the submission properly. Please send me a note explaining what happened. You
+should probably also attempt to send your submission again.
+
+Note that I am attempting to write the date/time of
+
+    $Time_Stamp
+
+into my submission records so that I can verify that you attempted to submit this assignment at
+the date/time above. It is possible, however, that I might not be able to successfully write
+this date/time into my records so in any case you should send me a note promptly explaining that
+you got this message.
+
+Sorry about the error,
+The Submission Daemon
+EOF
+    close(MAILER);
+    exit;
+}
+
+
+sub Confirmation {
+    my $From_Address = $_[0];
+    my $Description  = $_[1];
+
+    open(MAILER, "|/bin/mail -s \"sub Confirmation.\" $From_Address");
+    print MAILER <<EOF;
+
+Submission confirmed!
+
+You recently sent me a submission with a subject line of
+
+    $Description
+
+I have received this submission and filed it into the appropriate folder. If you made an error
+in your subject line and submitted your work to the wrong folder, resubmit your work with a
+correct subject line and then send me a note explaining what happened.
+
+Your submission has been time stamped with the date/time of
+
+    $Time_Stamp
+
+I will use this date/time to determine if your work is late. If you feel this time stamp is
+incorrect, please send me a note explaining why.
+
+Thank you,
+The Submission Daemon
+EOF
+
+    close(MAILER);
+}
+
+
+@Day_Names   = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat");
+@Month_Names = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec");
+
+# TODO: The email address used in the header should be configurable.
+sub Write_Header {
+    printf FOLDER "\nFrom %s %s %s %02d %02d:%02d:%02d %04d -%04d\n",
+      "PChapin\@vtc.vsc.edu",
+      $Day_Names[$wday],
+      $Month_Names[$mon],
+      $mday, $hour, $min, $sec, $year + 1900,
+      ($isdst ? 400 : 500);
+}
+
+
+#
+# Main Program
+#
+
+$In_Header = 1;
+
+# TODO: These file locations should be taken from a configuration file or some such.
+$Record_FileName = "/home/peter/sub/submission.rec";
+$Lock_FileName   = "/home/peter/sub/submission.lck";
+$Folder_Directory = "/home/peter/mail";
+
+# Figure out what the date and time is right now.
+($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) =
+    localtime;
+$Year  = $year + 1900;
+$Month = $mon + 1;
+$Time_Stamp =
+    sprintf "%d-%02d-%02dT%02d:%02d:%02d",
+      $Year, $Month, $mday, $hour, $min, $sec;
+
+# Read the file at the standard input.
+$i = 0;
+while (<>) {
+    chomp;
+    $Text[$i++] = $_;
+
+    # If we come to a blank like while processing the header, the
+    # header is over.
+    #
+    if ($In_Header && /^$/) { $In_Header = 0; }
+
+    # Otherwise if we are still in the header, deal with it.
+    elsif ($In_Header) {
+        if (/^From: .*?([^\s<"]+\@[^\s>"]+)/) {
+            $From_Address = $1;
+        }
+        if (/^Subject: (.*)/) {
+            $Subject_Line = $1;
+        }
+    }
+
+    # Otherwise we are in the message body.
+    else {
+        # Nothing to do in this version...
+    }
+}
+
+# Now figure out what assignment this is by looking at the subject line.
+if ($Subject_Line =~ /cis[\s-]?([0-9]+)/i) {
+    $Course = $1;
+}
+if ($Subject_Line =~ /home[a-z\s\#]*([0-9]+)/i) {
+    $Homework = $1;
+}
+if ($Subject_Line =~ /lab[\s\#]*([0-9]+)/i) {
+    $Lab = $1;
+}
+if ($Subject_Line =~ /((prog)|(prob))[a-z\s\#]*([0-9]+)/i) {
+    $Problem = $4;
+}
+
+# If we don't know what they are talking about, tell them.
+if (!$Course || (!$Homework && !$Lab && !$Problem)) {
+    Assignment_Error($From_Address);
+}
+
+# Compute the description string and the mail folder name.
+$Description = "CIS-$Course, ";
+$Folder_Name = "CIS-$Course.";
+if ($Homework) {
+    $Description .= "Homework \#$Homework";
+    $Folder_Name .= "HOME-" . sprintf "%02d", $Homework;
+}
+if ($Lab) {
+    $Description .= "Lab \#$Lab";
+    $Folder_Name .= "LAB-" . sprintf "%02d", $Lab;
+}
+if ($Problem) {
+    $Description .= "Programming Problem \#$Problem";
+    $Folder_Name .= "PROB-" . sprintf "%02d", $Problem;
+}
+
+# Update submission records.
+open(RECORDS, ">>$Record_FileName") ||
+    General_Error($From_Address, $Description);
+print RECORDS "$Time_Stamp $From_Address ($Description)\n";
+close(RECORDS);
+
+# Check to see if I'm still accepting submissions for this assignment.
+open(LOCK, "$Lock_FileName") ||
+    General_Error($From_Address, $Description);
+while (<LOCK>) {
+    if ($Homework) {
+        if (/CIS-([0-9]+) Homework ([0-9]+)/) {
+            if ($Course == $1 && $Homework <= $2) {
+                Submission_Error($From_Address);
+            }
+        }
+    }
+    if ($Lab) {
+        if (/CIS-([0-9]+) Lab ([0-9]+)/) {
+            if ($Course == $1 && $Lab <= $2) {
+                Submission_Error($From_Address);
+            }
+        }
+    }
+    if ($Problem) {
+        if (/CIS-([0-9]+) Problem ([0-9]+)/) {
+            if ($Course == $1 && $Problem <= $2) {
+                Submission_Error($From_Address);
+            }
+        }
+    }
+}
+close(LOCK);
+
+# Write the mail message to the mail folder.
+open(FOLDER, ">>$Folder_Directory/$Folder_Name") ||
+    General_Error($From_Address, $Description);
+Write_Header();
+for ($i = 0; $i < @Text; $i++) {
+    print FOLDER "$Text[$i]\n";
+}
+close(FOLDER);
+
+# Tell the student that he/she is cool.
+Confirmation($From_Address, $Description);

@@ -1,0 +1,84 @@
+#!/bin/bash
+############################################################################
+# FILE        : grade
+# AUTHOR      : Peter Chapin
+# LAST REVISED: August 2013
+# SUBJECT     : Grading script.
+#
+# This script coordinates the grading of submissions.
+#
+# It must be run from the "root" directory of a tree of student directories. Each student
+# directory should contain all the files submitted by that student pertaining to the problem at
+# hand. This script descends into each student directory to do what it needs to do.
+############################################################################
+
+main_menu(){
+    echo ""
+    echo "0. Exit."
+    echo "1. Continue."
+    echo "2. Drop to a shell."
+    echo "3. Compile program."
+    echo "4. View error file."
+    echo "5. Edit files."
+    echo "6. Mail results."
+    echo "7. Remove error file."
+    echo ""
+    echo -n "Choice? "
+    read RESPONSE junk
+}
+
+# ===========
+# Main Script
+# ===========
+
+PS1="(grade script shell) "
+
+# For all the files/directories in the current directory...
+for DIR in *; do
+
+    # If we are looking at a directory...
+    if [ -d $DIR ]; then
+        cd $DIR
+    
+        # Get the last name from the directory name.
+        last_name=$(echo $DIR | awk '$0 = substr($0, 2)')
+        echo $last_name
+
+        # Keep looping on the student menu until we the user says not to.
+        RETRY=yes
+        while [ $RETRY = "yes" ]; do
+            clear
+            echo "Processing $DIR..."
+            ls -l
+            main_menu
+
+            case $RESPONSE in
+            0) exit;;
+
+            1) RETRY=no;;
+
+            2) bash;;
+
+            3) javac $DIR.java 2>errors.txt
+               if [ -s errors.txt ]; then
+                   echo "(errors or warnings)"
+                   read JUNK
+               fi;;
+
+	    4) less errors.txt;;
+
+	    5) pico $DIR.java;;
+
+            6) alpine $(lookup_email $last_name);;
+            
+            7) rm errors.txt;;
+
+            *) echo "Unknown option!"
+            esac
+        done
+
+        cd ..
+    fi
+done
+
+exit

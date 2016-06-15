@@ -1,2 +1,7 @@
-# grading
-Utilities to assist with grading papers
+Grading
+=======
+
+Tools for grading papers.
+
+Peter C. Chapin  
+PChapin@vtc.vsc.edu

@@ -1,0 +1,9 @@
+
+# Build artifacts of Visual Studio
+Debug
+Release
+*.sdf
+*.suo
+
+# Scala build artifacts
+*.class

@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# This script flattens the directory structure created by subunflatten by moving files in sub-
+# directories to the current directory. It then removes the subdirectories.
+#
+
+# TODO: Some error checking would be nice.
+for DIR in *; do
+    if [ -d $DIR ]; then
+        cd $DIR
+        mv * ..
+        cd ..
+        rm -r $DIR
+    fi
+done

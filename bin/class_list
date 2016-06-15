@@ -1,0 +1,106 @@
+#!/usr/bin/perl
+###########################################################################
+# FILE    : class_list.pl
+# SUBJECT : This script is a skeleton for processing my class list.
+# AUTHOR  : Peter C. Chapin <PChapin@vtc.vsc.edu>
+#
+# This script can be used as a basis for a variety of scripts that scan over my class list and
+# do various operations on the students found therein. Copy this script to a new file and edit
+# it (see comments below) according to the needs of your particular application.
+###########################################################################
+
+
+#
+# process_line
+#
+# This subroutine is called for each line of a student record. It assigns a value to an
+# appropriate variable for later. This is a support function.
+#
+sub process_line
+{
+  @info = split(/\s*=\s*/, $_[0]);
+  if    ($info[0] eq "LAST"     ) { $last      = $info[1]; }
+  elsif ($info[0] eq "FIRST"    ) { $first     = $info[1]; }
+  elsif ($info[0] eq "EMAIL"    ) { $email     = $info[1]; }
+  elsif ($info[0] eq "PHONE"    ) { $phone     = $info[1]; }
+  elsif ($info[0] eq "CLASS"    ) { $class     = $info[1]; }
+  elsif ($info[0] eq "USERNAME" ) { $username  = $info[1]; }
+  elsif ($info[0] eq "PASSWORD" ) { $password  = $info[1]; }
+  elsif ($info[0] eq "COMMENT"  ) { $comment   = $info[1]; }
+
+}
+
+
+#
+# process_end
+#
+# This subroutine is called at the end of each student record. It uses the values found in the
+# record as needed and resets them all to empty strings for the next record. This is where your
+# per-student logic goes.
+#
+sub process_end
+{
+  print "Processing $first $last\n";
+
+  # Here is where this particular student is processed. The variables (shown below) have
+  # meaningful values at this time.
+
+  $last      = "";
+  $first     = "";
+  $email     = "";
+  $phone     = "";
+  $class     = "";
+  $username  = "";
+  $password  = "";
+  $comment   = "";
+}
+
+
+# ===========
+# Main Script
+# ===========
+
+# Here is where application specific initialization needs to be performed.
+
+# Try to open the master file.
+# TODO: The path to the class list should be configurable.
+if (!open(LIST_FILE, "/home/peter/VTC/Gradebook/class_list.txt")) {
+  print "Can't open class_list.txt for reading! In the correct directory?\n";
+  exit;
+}
+
+$in_record = 0;
+
+# Read the master file a line at a time.
+while (<LIST_FILE>) {
+
+  # Remove comments and split the line.
+  chomp;
+  s/\#.*//;
+  s/\s+$//;
+
+  # Depending on the state variable, in_record, do appropriate things.
+  if (! /^$/ && !$in_record) {
+    process_line($_);
+    $in_record = 1;
+  }
+  elsif (! /^$/  && $in_record) {
+    process_line($_);
+  }
+  elsif (/^$/ && !$in_record) {
+    # Blank space between records. Ignore it.
+  }
+  elsif (/^$/ && $in_record) {
+    process_end();
+    $in_record = 0;
+  }
+  else {
+    print "Error: Bad logic in main loop!\n";
+  }
+}
+
+# Close the master file.
+close(LIST_FILE);
+
+# Here is where application specific clean up needs to be performed.
+

@@ -1,0 +1,203 @@
+#!/usr/bin/perl
+###########################################################################
+# FILE    : trouble.pl
+# SUBJECT : Scans my gradebook file looking for students in trouble.
+# AUTHOR  : Peter Chapin <PChapin@vtc.vsc.edu>
+#
+# This version just looks for students who have not turned in any recent assignments.
+###########################################################################
+
+# Analyze the command line.
+if (@ARGV != 1) {
+    print "usage: trouble.pl gradebook-file\n";
+    exit 1;
+}
+
+# Give distinguished initial values to certain variables.
+$type_code         = "";
+$assignment_number = 0;
+$possible_points   = 0;
+$comment           = "";
+
+# Read the gradebook specified and remember interesting things about it.
+open(GRADEBOOK, $ARGV[0]) || die "Can't open $ARGV[0] for reading\n";
+while (<GRADEBOOK>) {
+    chomp;
+
+    # Strip comments.
+    s/#.*//;
+
+    # Ignore blank lines.
+    if (/^\s*$/) { next; }
+
+    # If this line is an assignment header, remember its attributes.
+    if (/^-([EFLQHP])(\d+)\s+(\d+)\s+\((.*)\)/) {
+        $type_code         = $1;
+        $assignment_number = $2;
+        $possible_points   = $3;
+        $comment           = $4;
+
+        $type_name = "Unknown";
+        if ($type_code eq "E") { $type_name = "Exam";     }
+        if ($type_code eq "F") { $type_name = "Final";    }
+        if ($type_code eq "L") { $type_name = "Lab";      }
+        if ($type_code eq "Q") { $type_name = "Quiz";     }
+        if ($type_code eq "W") { $type_name = "Homework"; }
+        if ($type_code eq "P") { $type_name = "Project";  }
+    }
+
+    # Otherwise it must be a grade. If it's a zero, remember it. If not then erase any old zeros
+    # (only interested in zeros on most recent work). BUG: A non-zero grade in a new assignment
+    # type will erase zeros in a previous assignment type. This code really only works if the
+    # gradebook file contains a single assignment type.
+    #
+    else {
+
+        # This hack fixes the bug mentioned above by only looking for homework grades.
+        # Eventually a more comprehensive analysis should be done.
+        #
+        if ($type_name ne "Homework") { next; }
+
+        @grade_info = split(/\s+/);
+        if ($grade_info[2] == 0) {
+            $zeros{"$grade_info[1] $grade_info[0]"} .=
+                "$type_name \#$assignment_number: $comment\n";
+        }
+        else {
+            delete $zeros{"$grade_info[1] $grade_info[0]"};
+        }
+    }
+}
+close(GRADEBOOK);
+
+# -----
+# Read the class list file and map student names to email addresses.
+# -----
+
+#
+# process_line
+#
+# This subroutine is called for each line of a student record. It assigns a value to an
+# appropriate variable for later. This is a support function.
+#
+sub process_line
+{
+  @info = split(/\s*=\s*/, $_[0]);
+  if    ($info[0] eq "LAST"     ) { $last      = $info[1]; }
+  elsif ($info[0] eq "FIRST"    ) { $first     = $info[1]; }
+  elsif ($info[0] eq "EMAIL"    ) { $email     = $info[1]; }
+  elsif ($info[0] eq "PHONE"    ) { $phone     = $info[1]; }
+  elsif ($info[0] eq "CLASS"    ) { $class     = $info[1]; }
+  elsif ($info[0] eq "USERNAME" ) { $username  = $info[1]; }
+  elsif ($info[0] eq "PASSWORD" ) { $password  = $info[1]; }
+  elsif ($info[0] eq "COMMENT"  ) { $comment   = $info[1]; }
+
+}
+
+
+#
+# process_end
+#
+# This subroutine is called at the end of each student record. It uses the values found in the
+# record as needed and resets them all to empty strings for the next record. This is where your
+# per-student logic goes.
+#
+sub process_end
+{
+#  print "Processing $first $last\n";
+
+  # Here is where this particular student is processed. The variables (shown below) have
+  # meaningful values at this time.
+  #
+  $email_addresses{"$first $last"} = $email;
+
+  $last      = "";
+  $first     = "";
+  $email     = "";
+  $phone     = "";
+  $class     = "";
+  $username  = "";
+  $password  = "";
+  $comment   = "";
+}
+
+
+# Try to open the master file.
+# TODO: The path to the class list should be configurable.
+if (!open(LIST_FILE, "/home/peter/VTC/Gradebook/class_list.txt")) {
+  print "Can't open class_list.txt for reading! In the correct directory?\n";
+  exit;
+}
+
+$in_record = 0;
+
+# Read the master file a line at a time.
+while (<LIST_FILE>) {
+
+  # Remove comments and split the line.
+  chomp;
+  s/\#.*//;
+  s/\s+$//;
+
+  # Depending on the state variable, in_record, do appropriate things.
+  if (! /^$/ && !$in_record) {
+    process_line($_);
+    $in_record = 1;
+  }
+  elsif (! /^$/  && $in_record) {
+    process_line($_);
+  }
+  elsif (/^$/ && !$in_record) {
+    # Blank space between records. Ignore it.
+  }
+  elsif (/^$/ && $in_record) {
+    process_end();
+    $in_record = 0;
+  }
+  else {
+    print "Error: Bad logic in main loop!\n";
+  }
+}
+
+# Close the master file.
+close(LIST_FILE);
+
+# Now send out the results.
+foreach $key (keys %zeros) {
+    if (! defined $email_addresses{$key}) {
+        print "Help! No email address for $key!\n\n";
+    }
+    else {
+        # Since a person might have multiple addresses, loop over all of them.
+        @address_list = split(/\s*,\s*/, $email_addresses{$key});
+        for ($i = 0; $i < @address_list; $i++) {
+            print "Emailing to: $address_list[$i]\n";
+            open(MAILER, "|/usr/bin/mailx -s \"Gradebook Warning!\" $address_list[$i]");
+            print MAILER <<EOF;
+
+This is an automated message.
+
+I appear to be missing the following recent assignment(s) from you:
+
+$zeros{$key}
+
+Although my late policy precludes you from making up this work, you should do what you can to
+avoid missing any more assignments in the future. If you are having problems with the material,
+feel that there are extenuating circumstances in your situation, or believe that you received
+this message in error, please contact me at
+
+    PChapin\@vtc.vsc.edu
+
+I encourage you to review all your grades on-line at
+
+    http://web.vtc.edu/users/pcc09070/gradebook.html
+
+If you do not know your gradebook password, send me a note containing the password you would
+like to use and I will set you up.
+
+Peter
+EOF
+            close(MAILER);
+        }
+    }
+}

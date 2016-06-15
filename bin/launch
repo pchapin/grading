@@ -1,0 +1,58 @@
+#!/bin/bash
+########################################################################
+# FILE        : launch
+# AUTHOR      : Peter Chapin
+# SUBJECT     : Script to return graded materials.
+# LAST REVISED: August 28, 2001
+#
+# This script returns graded materials to the students. It assumes all
+# the graded work is in files with a .txt extension in the current dir-
+# ectory. The base part of the file name is the student's username on
+# twilight. After mailing all the files, this script packs them in an
+# archive for safekeeping.
+#
+# Expected parameters: course-name lesson-designation.
+#   course-name       : All upper case with a dash (CS-211)
+#   lesson-designation: All upper case with a dash and two digit worksheet
+#                       number (WORK-02)
+########################################################################
+
+WORK_DIR="/home/peter/tmp/work"
+  # Directory where the graded files are located.
+
+MAIL_DIR="/home/peter/mail"
+  # Directory where the mail folders are stored.
+
+ARCHIVE_DIR="/home/peter/archive"
+  # Directory where the final archive will be kept.
+
+##### Shouldn't need to change anything below this line. #####
+
+# Verify that the various directories exist.
+if [ ! -d $WORK_DIR -o ! -d $MAIL_DIR -o ! -d $ARCHIVE_DIR ]; then
+  echo "Error: one of the required directories does not exist."
+  exit 1
+fi
+cd $WORK_DIR
+
+# Verify that the parameters exist.
+if [ $# -ne 2 ]; then
+  echo "usage: launch course-name worksheet-designation"
+  exit 1
+fi
+
+COURSE_NAME=$1
+WORKSHT_DESIGNATION=$2
+
+# Mail the results to the students.
+SUBJECT_LINE="$COURSE_NAME, $WORKSHT_DESIGNATION graded."
+for FILE in *.txt; do
+  echo $FILE
+  mailx -s "$SUBJECT_LINE" `basename $FILE .txt`@midnight.vtc.vsc.edu < $FILE
+done
+
+# Now store these flies in the archive and clean up the mess.
+mv $MAIL_DIR/$COURSE_NAME.$WORKSHT_DESIGNATION .
+zip $COURSE_NAME.$WORKSHT_DESIGNATION.zip *.*
+mv $COURSE_NAME.$WORKSHT_DESIGNATION.zip $ARCHIVE_DIR
+rm $WORK_DIR/*.*

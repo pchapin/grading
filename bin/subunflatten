@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# This script creates subdirectories in the current directory based on the files it finds.
+# For each file of the form base.ext a subdirectory named 'base' is created and the file
+# is moved into that directory. When the script completes the current directory should only
+# contain subdirectories.
+#
+
+for FILE in *; do
+    if [ -f "$FILE" ]; then
+        # Strip the extension.
+        # TODO: It might be better to use only the last dot to delimit the extension.
+        base=$(echo $FILE | awk 'gsub(/\..*/, "")')
+        
+        # Make the target directory only if it's not already there.
+        if [ ! -d $base ]; then
+            mkdir $base
+        fi
+        mv $FILE $base
+    fi
+done
