@@ -4,6 +4,7 @@ Debug
 Release
 *.sdf
 *.suo
+.vs
 
 # Scala build artifacts
 *.class
